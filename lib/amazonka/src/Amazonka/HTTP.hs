@@ -28,6 +28,7 @@ import Control.Monad.Trans.Resource (liftResourceT, transResourceT)
 import qualified Control.Retry as Retry
 import Data.Foldable (traverse_)
 import qualified Data.Time as Time
+import qualified Network.HTTP.Client as Client
 import qualified Network.HTTP.Conduit as Client.Conduit
 
 retryRequest ::
@@ -84,7 +85,12 @@ awaitRequest env@Env {hooks} w rq = do
   w'@Wait {..} <- liftIO $ Hooks.wait hooks env w
 
   let handleResult res = (fromMaybe AcceptRetry $ accept w' cfgRq res, res)
-      attempt _ = handleResult <$> httpRequest env cfgRq
+      attempt _ = do
+        result <- httpRequest env cfgRq
+        traverse_
+          (liftIO . Exception.evaluate . evaluateResponse rq . Client.responseBody)
+          result
+        pure (handleResult result)
       policy =
         Retry.limitRetries attempts
           <> Retry.constantDelay (toMicroseconds delay)

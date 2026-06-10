@@ -8,13 +8,15 @@
 module Test.Amazonka.Send (tests) where
 
 import Amazonka hiding (accept, error, runResourceT)
+import qualified Amazonka.Auth as Auth
 import qualified Amazonka.Data as Data
 import qualified Amazonka.Request as Request
 import qualified Amazonka.Response as Response
 import qualified Amazonka.STS as STS
+import qualified Amazonka.Waiter as Waiter
 import Control.Concurrent (ThreadId, forkFinally, forkIO, killThread)
 import Control.DeepSeq (NFData (..))
-import Control.Exception (SomeException, bracket, displayException, try)
+import Control.Exception (ErrorCall (..), SomeException, bracket, displayException, try)
 import Control.Monad (void)
 import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString as ByteString
@@ -38,7 +40,7 @@ import Network.Socket
   )
 import qualified Network.Socket.ByteString as Socket
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertFailure, testCase)
+import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
 import Prelude
 
 data DeepProbe = DeepProbe
@@ -101,11 +103,14 @@ tests =
     "Send response evaluation"
     [ testCase "sendUnsignedEither evaluates the selected response policy" $
         withTestServer $ \port -> do
-          result <- try @SomeException $ withEnv port $ \env ->
-            runResourceT $ void (sendUnsignedEither env DeepProbe)
-          case result of
-            Left _ -> pure ()
-            Right () -> assertFailure "expected deep response evaluation to throw",
+          assertDeepResponseForced $
+            withEnv port $ \env ->
+              runResourceT $ void (sendUnsignedEither env DeepProbe),
+      testCase "awaitEither evaluates successful responses before acceptors" $
+        withTestServer $ \port -> do
+          assertDeepResponseForced $
+            withSignedEnv port $ \env ->
+              runResourceT $ void (awaitEither env successfulWait DeepProbe),
       testCase "the default response policy does not require NFData" $
         withTestServer $ \port -> do
           result <- try @SomeException $ withEnv port $ \env ->
@@ -118,12 +123,37 @@ tests =
             Right () -> pure ()
     ]
 
+successfulWait :: Waiter.Wait DeepProbe
+successfulWait =
+  Waiter.Wait
+    { Waiter.name = "deep-probe",
+      Waiter.attempts = 1,
+      Waiter.delay = 0,
+      Waiter.acceptors = [\_ _ -> Just Waiter.AcceptSuccess]
+    }
+
+assertDeepResponseForced :: IO () -> IO ()
+assertDeepResponseForced action = do
+  result <- try @ErrorCall action
+  case result of
+    Left (ErrorCall message) ->
+      assertEqual "unexpected evaluation exception" "deep response was forced" message
+    Right () -> assertFailure "expected deep response evaluation to throw"
+
 withEnv :: Int -> (EnvNoAuth -> IO a) -> IO a
 withEnv port action = do
   manager <- Client.newManager Client.defaultManagerSettings
   env <- newEnvNoAuthFromManager manager
   let service = setEndpoint False "127.0.0.1" port STS.defaultService
   action (once (configureService service env))
+
+withSignedEnv :: Int -> (Env -> IO a) -> IO a
+withSignedEnv port action =
+  withEnv port $
+    action
+      . Auth.fromKeys
+        (AccessKey "test-access-key")
+        (SecretKey "test-secret-key")
 
 data TestServer = TestServer
   { serverSocket :: Socket,

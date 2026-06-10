@@ -662,7 +662,8 @@ class (Typeable a, Typeable (AWSResponse a)) => AWSRequest a where
   -- | The successful, expected response associated with a request.
   type AWSResponse a :: Type
 
-  -- | Evaluate a successful response before returning it from 'sendEither'.
+  -- | Evaluate a successful response before returning it from a send operation
+  -- or passing it to a waiter acceptor.
   --
   -- The default evaluates only the outer constructor, which preserves
   -- streaming responses. Generated non-streaming requests override this
