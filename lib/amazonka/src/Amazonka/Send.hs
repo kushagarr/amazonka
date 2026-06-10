@@ -10,7 +10,7 @@ module Amazonka.Send
   )
 where
 
-import Amazonka.Core (AWSPager, AWSRequest, AWSResponse, Error)
+import Amazonka.Core (AWSPager, AWSRequest (..), AWSResponse, Error)
 import Amazonka.Env (Env, Env' (..))
 import qualified Amazonka.HTTP as HTTP
 import qualified Amazonka.Pager as Pager
@@ -29,10 +29,10 @@ sendEither ::
   Env ->
   a ->
   m (Either Error (AWSResponse a))
-sendEither env rq =
-  HTTP.retryRequest env rq <&> strictResponse
-  where
-    strictResponse = forceRight . fmap Client.responseBody
+sendEither env rq = do
+  result <- fmap Client.responseBody <$> HTTP.retryRequest env rq
+  evaluateSuccessfulResponse rq result
+  pure result
 
 -- | Send a request, returning the associated response if successful.
 --
@@ -61,10 +61,10 @@ sendUnsignedEither ::
   Env' withAuth ->
   a ->
   m (Either Error (AWSResponse a))
-sendUnsignedEither env rq =
-  HTTP.retryRequest (env {auth = Proxy}) rq <&> strictResponse
-  where
-    strictResponse = forceRight . fmap Client.responseBody
+sendUnsignedEither env rq = do
+  result <- fmap Client.responseBody <$> HTTP.retryRequest (env {auth = Proxy}) rq
+  evaluateSuccessfulResponse rq result
+  pure result
 
 -- | Make an unsigned request, returning the associated response if successful.
 --
@@ -142,7 +142,12 @@ await env wait =
 hoistEither :: (MonadIO m) => Either Error a -> m a
 hoistEither = either (liftIO . Exception.throwIO) pure
 
-forceRight :: (NFData b) => Either e b -> Either e b
-forceRight = \case
-  Left e -> Left e
-  Right b -> rnf b `seq` Right b
+evaluateSuccessfulResponse ::
+  (MonadIO m, AWSRequest a) =>
+  a ->
+  Either Error (AWSResponse a) ->
+  m ()
+evaluateSuccessfulResponse rq = \case
+  Left _ -> pure ()
+  Right result ->
+    liftIO . Exception.evaluate $ evaluateResponse rq result

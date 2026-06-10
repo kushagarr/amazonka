@@ -658,15 +658,17 @@ requestUnsigned Request {service = Service {..}, ..} r =
     end = endpoint r
 
 -- | Specify how a request can be de/serialised.
-class
-  ( Typeable a,
-    Typeable (AWSResponse a),
-    NFData (AWSResponse a)
-  ) =>
-  AWSRequest a
-  where
+class (Typeable a, Typeable (AWSResponse a)) => AWSRequest a where
   -- | The successful, expected response associated with a request.
   type AWSResponse a :: Type
+
+  -- | Evaluate a successful response before returning it from 'sendEither'.
+  --
+  -- The default evaluates only the outer constructor, which preserves
+  -- streaming responses. Generated non-streaming requests override this
+  -- with 'rnf'.
+  evaluateResponse :: a -> AWSResponse a -> ()
+  evaluateResponse _ result = result `seq` ()
 
   request ::
     -- | Overrides applied to the default 'Service'.

@@ -128,9 +128,15 @@ test-suite tests
   main-is:           Main.hs
   other-modules:
     Test.Amazonka.Auth.Background
+    Test.Amazonka.Send
   build-depends:
     , amazonka
     , amazonka-core
+    , amazonka-sts
+    , bytestring
+    , deepseq
+    , network
+    , resourcet
     , tasty              >=0.10
     , tasty-hunit        >=0.9
     , time
