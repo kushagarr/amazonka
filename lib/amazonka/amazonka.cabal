@@ -134,6 +134,7 @@ test-suite tests
     , amazonka-core
     , amazonka-sts
     , bytestring
+    , conduit
     , deepseq
     , network
     , resourcet

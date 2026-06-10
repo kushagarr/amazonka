@@ -668,6 +668,9 @@ class (Typeable a, Typeable (AWSResponse a)) => AWSRequest a where
   -- The default evaluates only the outer constructor, which preserves
   -- streaming responses. Generated non-streaming requests override this
   -- with 'rnf'.
+  --
+  -- Evaluation happens after response hooks. Any exception raised by this
+  -- method is propagated through IO and is not converted to 'Error'.
   evaluateResponse :: a -> AWSResponse a -> ()
   evaluateResponse _ result = result `seq` ()
 
