@@ -4,6 +4,9 @@
 
 ### Changed
 
+- `amazonka`: `Amazonka.Auth.SSO.fromSSO` throws an `AuthError` now.  Previously
+  it could throw a `Amazonka.Types.Error`.
+  [\#1060](https://github.com/brendanhay/amazonka/pull/1060)
 - `amazonka`: Improve error handling during periodic credential refresh in `fetchAuthInBackground`.
   Exceptions thrown by the refresh action are now categorized and rethrown to the parent thread as
   `RetrievalError`, `AuthServiceError`, or `OtherAuthError` (instead of just `RetrievalError` which was a bug). (thanks @kushagarr)
@@ -96,6 +99,8 @@
 
 ### Fixed
 
+- `amazonka`: `Amazonka.Auth.SSO.relativeCachedTokenFile` is now pure
+[\#1056](https://github.com/brendanhay/amazonka/pull/1056)
 - `amazonka-core`: `containers ^>= 0.7` is now supported. `containers-0.7` is shipped with GHC 9.10 and 9.12.
 [\#1036](https://github.com/brendanhay/amazonka/pull/1036)
 - `amazonka-core`: Accept single-digit days when parsing RFC822 dates

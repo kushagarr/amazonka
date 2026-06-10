@@ -101,7 +101,7 @@ library
     Amazonka.Data, Amazonka.Types, Amazonka.Bytes, Amazonka.Endpoint, Amazonka.Crypto
 
   build-depends:
-    , aeson                 ^>=1.5.0.0  || ^>=2.0 || ^>=2.1 || ^>=2.2
+    , aeson                 ^>=1.5.0.0  || ^>=2.0 || ^>=2.1 || ^>=2.2 || ^>=2.3
     , amazonka-core         ^>=2.0
     , amazonka-sso          ^>=2.0
     , amazonka-sts          ^>=2.0
@@ -142,3 +142,6 @@ test-suite tests
     , time
     , http-client
     , http-types
+    , tasty          >=0.10
+    , tasty-hunit    >=0.9
+    , time
