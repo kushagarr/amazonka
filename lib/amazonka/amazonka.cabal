@@ -142,6 +142,3 @@ test-suite tests
     , time
     , http-client
     , http-types
-    , tasty          >=0.10
-    , tasty-hunit    >=0.9
-    , time
