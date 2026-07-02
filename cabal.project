@@ -5,10 +5,9 @@ write-ghc-environment-files: never
 --   cabal configure --disable-optimization
 optimization: 1
 
--- These releases compile with the boot-library versions shipped by GHC 9.14,
--- but their published upper bounds have not caught up yet.
+-- This release compiles with the containers version shipped by GHC 9.14,
+-- but its published upper bound has not caught up yet.
 allow-newer:
-   microlens-pro:template-haskell,
    ordered-containers:containers
 
 -- Local packages.

@@ -115,7 +115,7 @@ library
     , http-client           >=0.5       && <0.8
     , http-conduit          >=2.3       && <3
     , http-types            >=0.12
-    , microlens             ^>=0.4.13.1
+    , microlens             ^>=0.4.13.1 || ^>=0.5.0.0
     , microlens-contra      ^>=0.1.0.3
     , microlens-pro         ^>=0.2.0
     , ram                   ^>=0.22
