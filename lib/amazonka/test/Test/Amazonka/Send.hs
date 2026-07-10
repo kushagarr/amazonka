@@ -10,6 +10,7 @@ module Test.Amazonka.Send (tests) where
 import Amazonka hiding (accept, error, runResourceT)
 import qualified Amazonka.Auth as Auth
 import qualified Amazonka.Data as Data
+import qualified Amazonka.DynamoDB as DynamoDB
 import qualified Amazonka.Env.Hooks as Hooks
 import qualified Amazonka.Request as Request
 import qualified Amazonka.Response as Response
@@ -18,7 +19,7 @@ import qualified Amazonka.Waiter as Waiter
 import Control.Concurrent (ThreadId, forkFinally, forkIO, killThread)
 import Control.DeepSeq (NFData (..))
 import Control.Exception (ErrorCall (..), SomeException, bracket, displayException, try)
-import Control.Monad (void)
+import Control.Monad (replicateM_, void)
 import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as ByteString.Char8
@@ -45,6 +46,7 @@ import Network.Socket
     withSocketsDo,
   )
 import qualified Network.Socket.ByteString as Socket
+import qualified System.Timeout as Timeout
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
 import Prelude
@@ -220,6 +222,26 @@ tests =
           assertDeepResponseForced $
             withSignedEnv port $ \env ->
               runResourceT $ void (sendEither env DeepProbe),
+      testCase "discarded DynamoDB PutItem successes do not stall" $
+        withTestServerResponses
+          (replicate dynamoDBRequestCount dynamoDBSuccessfulResponse)
+          $ \port ->
+            assertCompletes "discarded successful PutItem responses stalled" $
+              withDynamoDBEnv port $ \env ->
+                runResourceT $
+                  replicateM_ dynamoDBRequestCount $
+                    void (send env (DynamoDB.newPutItem "test-table")),
+      testCase "discarded DynamoDB PutItem errors do not stall" $
+        withTestServerResponses
+          (replicate dynamoDBRequestCount dynamoDBErrorResponse)
+          $ \port ->
+            assertCompletes "discarded failed PutItem responses stalled" $
+              withDynamoDBEnv port $ \env ->
+                replicateM_ dynamoDBRequestCount $
+                  void $
+                    try @Error $
+                      runResourceT $
+                        void (send env (DynamoDB.newPutItem "test-table")),
       testCase "sendEither uses the request returned by request hooks" $
         withTestServer $ \port -> do
           assertDeepResponseForced $
@@ -387,6 +409,12 @@ assertDeepResponseForced action = do
       assertEqual "unexpected evaluation exception" "deep response was forced" message
     Right () -> assertFailure "expected deep response evaluation to throw"
 
+assertCompletes :: String -> IO a -> IO ()
+assertCompletes failureMessage action =
+  Timeout.timeout responseTimeout action >>= \case
+    Nothing -> assertFailure failureMessage
+    Just _ -> pure ()
+
 withEnv :: Int -> (EnvNoAuth -> IO a) -> IO a
 withEnv = withEnvUsing once
 
@@ -412,6 +440,21 @@ withSignedEnv port action =
       . Auth.fromKeys
         (AccessKey "test-access-key")
         (SecretKey "test-secret-key")
+
+withDynamoDBEnv :: Int -> (Env -> IO a) -> IO a
+withDynamoDBEnv port action = do
+  manager <-
+    Client.newManager
+      Client.defaultManagerSettings
+        { Client.managerConnCount = 1
+        }
+  env <- newEnvNoAuthFromManager manager
+  let service = setEndpoint False "127.0.0.1" port DynamoDB.defaultService
+  action $
+    Auth.fromKeys
+      (AccessKey "test-access-key")
+      (SecretKey "test-secret-key")
+      (configureService service env)
 
 withHookProbeForcing :: Env -> Env
 withHookProbeForcing env =
@@ -487,6 +530,21 @@ serve serverReply connection = do
 
 successfulResponse :: ByteString.ByteString
 successfulResponse = serverResponse "200 OK" "ok"
+
+dynamoDBRequestCount :: Int
+dynamoDBRequestCount = 20
+
+responseTimeout :: Int
+responseTimeout = 10 * 1000 * 1000
+
+dynamoDBSuccessfulResponse :: ByteString.ByteString
+dynamoDBSuccessfulResponse = serverResponse "200 OK" "{}"
+
+dynamoDBErrorResponse :: ByteString.ByteString
+dynamoDBErrorResponse =
+  serverResponse
+    "400 Bad Request"
+    "{\"__type\":\"ValidationException\",\"message\":\"expected test failure\"}"
 
 serverResponse :: ByteString.ByteString -> ByteString.ByteString -> ByteString.ByteString
 serverResponse status body =

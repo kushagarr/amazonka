@@ -132,6 +132,7 @@ test-suite tests
   build-depends:
     , amazonka
     , amazonka-core
+    , amazonka-dynamodb
     , amazonka-sts
     , bytestring
     , conduit
