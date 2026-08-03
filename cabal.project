@@ -5,11 +5,6 @@ write-ghc-environment-files: never
 --   cabal configure --disable-optimization
 optimization: 1
 
--- This release compiles with the containers version shipped by GHC 9.14,
--- but its published upper bound has not caught up yet.
-allow-newer:
-   ordered-containers:containers
-
 -- Local packages.
 packages:
    examples/
